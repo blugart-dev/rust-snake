@@ -4,6 +4,7 @@ mod constants;
 mod game;
 mod rendering;
 mod snake;
+mod theme;
 
 use std::io;
 use std::time::{Duration, Instant};
@@ -17,6 +18,7 @@ use constants::{
 };
 use game::{Game, GameState};
 use snake::Direction;
+use theme::Theme;
 
 /// A classic Snake game for the terminal.
 #[derive(Parser)]
@@ -29,6 +31,10 @@ struct Args {
     /// Board height in logical cells (overrides auto-detection).
     #[arg(long, value_name = "CELLS")]
     height: Option<u16>,
+
+    /// Color theme: classic, neon, or monochrome.
+    #[arg(long, default_value = "classic")]
+    theme: String,
 }
 
 /// Computes board dimensions from the terminal size, with optional overrides.
@@ -50,6 +56,14 @@ fn compute_board_size(args: &Args) -> (u16, u16) {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
+    let theme = Theme::from_name(&args.theme).unwrap_or_else(|| {
+        eprintln!(
+            "Unknown theme '{}'. Available: classic, neon, monochrome",
+            args.theme
+        );
+        std::process::exit(1);
+    });
+
     // Restore the terminal even on panic (raw mode would otherwise leave it unusable).
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -69,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = Instant::now();
 
     loop {
-        rendering::draw(&game, &mut stdout)?;
+        rendering::draw(&game, &mut stdout, &theme)?;
 
         // Determine tick interval based on game state
         let tick = match game.state {
