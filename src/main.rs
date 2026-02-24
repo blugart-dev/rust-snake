@@ -35,6 +35,10 @@ struct Args {
     /// Color theme: classic, neon, or monochrome.
     #[arg(long, default_value = "classic")]
     theme: String,
+
+    /// Disable terminal bell sound on food pickup and death.
+    #[arg(long)]
+    no_bell: bool,
 }
 
 /// Computes board dimensions from the terminal size, with optional overrides.
@@ -83,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = Instant::now();
 
     loop {
-        rendering::draw(&game, &mut stdout, &theme)?;
+        rendering::draw(&game, &mut stdout, &theme, !args.no_bell)?;
 
         // Determine tick interval based on game state
         let tick = match game.state {

@@ -47,7 +47,12 @@ fn terminal_width(board_width: u16) -> u16 {
 
 /// Renders the full game frame. All draw commands are queued into a single
 /// buffer and flushed once at the end to prevent flickering.
-pub fn draw(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
+pub fn draw(game: &Game, w: &mut impl Write, theme: &Theme, bell: bool) -> io::Result<()> {
+    // Terminal bell for audio feedback on food/death events
+    if bell && (game.ate_food || game.ate_bonus || game.just_died) {
+        queue!(w, Print("\x07"))?;
+    }
+
     draw_border(game, w, theme)?;
     draw_interior(game, w)?;
 
@@ -336,7 +341,7 @@ mod tests {
     fn render_to_string(game: &Game) -> String {
         let theme = Theme::classic();
         let mut buf = Vec::new();
-        draw(game, &mut buf, &theme).unwrap();
+        draw(game, &mut buf, &theme, false).unwrap();
         String::from_utf8_lossy(&buf).to_string()
     }
 

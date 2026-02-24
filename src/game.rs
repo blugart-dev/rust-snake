@@ -58,6 +58,12 @@ pub struct Game {
     pub(crate) high_score: usize,
     /// Ticks elapsed since the last bonus-food spawn attempt.
     ticks_since_bonus: u16,
+    /// Set to `true` for one tick after eating regular food.
+    pub(crate) ate_food: bool,
+    /// Set to `true` for one tick after eating bonus food.
+    pub(crate) ate_bonus: bool,
+    /// Set to `true` for one tick when a collision triggers death.
+    pub(crate) just_died: bool,
 }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
@@ -108,6 +114,9 @@ impl Game {
             score: 0,
             high_score: load_high_score(),
             ticks_since_bonus: 0,
+            ate_food: false,
+            ate_bonus: false,
+            just_died: false,
         };
 
         game.spawn_food();
@@ -210,6 +219,10 @@ impl Game {
 
     /// Advances the game by one tick: move, eat, collide.
     pub fn update(&mut self) {
+        self.ate_food = false;
+        self.ate_bonus = false;
+        self.just_died = false;
+
         match self.state {
             GameState::Playing => {}
             GameState::Dying(frame) => {
@@ -256,6 +269,7 @@ impl Game {
         // Food consumption
         if new_head == self.food {
             self.score += 1;
+            self.ate_food = true;
             if !self.spawn_food() {
                 if self.score > self.high_score {
                     self.high_score = self.score;
@@ -266,6 +280,7 @@ impl Game {
             }
         } else if self.bonus_food.as_ref().is_some_and(|b| b.pos == new_head) {
             self.score += BONUS_POINTS;
+            self.ate_bonus = true;
             self.bonus_food = None;
         } else {
             self.snake.body.pop_back();
@@ -278,6 +293,7 @@ impl Game {
     fn set_game_over(&mut self) {
         self.state = GameState::Dying(0);
         self.bonus_food = None;
+        self.just_died = true;
         if self.score > self.high_score {
             self.high_score = self.score;
             save_high_score(self.high_score);
@@ -716,5 +732,35 @@ mod tests {
             head,
             "Snake should not move during Paused"
         );
+    }
+
+    // ── Event flag tests ─────────────────────────────────────────────
+
+    #[test]
+    fn ate_food_flag_set_on_food_consumption() {
+        let mut game = test_game();
+        let head = *game.snake.head();
+        game.food = Position::new(head.x + 1, head.y);
+        game.snake.direction = Direction::Right;
+        game.update();
+        assert!(game.ate_food, "ate_food should be true after eating food");
+    }
+
+    #[test]
+    fn ate_food_flag_cleared_on_normal_tick() {
+        let mut game = test_game();
+        game.food = Position::new(1, 1);
+        game.snake.direction = Direction::Right;
+        game.update();
+        assert!(!game.ate_food, "ate_food should be false on normal tick");
+    }
+
+    #[test]
+    fn just_died_flag_set_on_collision() {
+        let mut game = test_game();
+        game.snake = Snake::new(15, 1);
+        game.snake.direction = Direction::Up;
+        game.update();
+        assert!(game.just_died, "just_died should be true after collision");
     }
 }
