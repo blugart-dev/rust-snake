@@ -20,10 +20,10 @@ Terminal-based Snake game written in Rust (edition 2024) using crossterm for ter
 ### Module Overview
 
 - **`main.rs`** — Game loop, terminal setup/teardown (raw mode, alternate screen), input handling via crossterm events. Parses CLI arguments via `clap` (`--width`, `--height`, `--theme`, `--no-bell`). Computes board dimensions from terminal size with optional overrides. Restores terminal on panic.
-- **`game.rs`** — Core game logic and state machine (`Game` struct). Manages snake movement, food spawning, collision detection, scoring, bonus food, speed progression, board resizing, and high score persistence (saved to `dirs::data_local_dir()/snake/highscore.txt`). High score I/O is stubbed out in `#[cfg(test)]`. Exposes transient `ate_food`/`ate_bonus`/`just_died` flags for audio feedback.
+- **`game.rs`** — Core game logic and state machine (`Game` struct). Manages snake movement, food spawning, collision detection, scoring, bonus food, speed progression, board resizing, and high score persistence (saved to `dirs::data_local_dir()/snake/highscore.txt`). High score I/O is stubbed out in `#[cfg(test)]`. `update()` returns a `TickEvents` struct describing what happened (ate food, ate bonus, died) so callers can react without polling game state.
 - **`snake.rs`** — `Snake` struct (VecDeque-based body), `Position`, `Direction` types. Implements a 2-element direction queue to buffer rapid keypresses between ticks and reject 180-degree reversals.
-- **`rendering.rs`** — All terminal drawing. Uses queued crossterm commands flushed once per frame to prevent flickering. Renders border, snake, food, bonus food, status bar, overlays (pause/game over/win), and ASCII art menu. Accepts a `Theme` for color customization and optional terminal bell.
-- **`theme.rs`** — Color theme definitions. `Theme` struct holds all game colors; built-in palettes: `classic` (default green-on-dark), `neon` (bright cyan/blue/yellow), `monochrome` (greyscale).
+- **`rendering.rs`** — All terminal drawing (visual only — no audio). Uses queued crossterm commands flushed once per frame to prevent flickering. Renders border, snake, food, bonus food, status bar, overlays (pause/game over/win), and ASCII art menu. Accepts a `Theme` for color customization.
+- **`theme.rs`** — Color theme definitions. `ThemeName` enum (parsed by clap via `ValueEnum`); `Theme` struct holds all game colors including death flash. Built-in palettes: `classic` (default green-on-dark), `neon` (bright cyan/blue/yellow), `monochrome` (greyscale).
 - **`constants.rs`** — All tunable game parameters: board size limits, cell width, speed curve, tick intervals, bonus food timing/points.
 
 ### Game State Machine
