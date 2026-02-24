@@ -97,7 +97,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Only advance the game when the tick interval has fully elapsed
         if last_tick.elapsed() >= tick {
             game.update();
-            last_tick = Instant::now();
+            last_tick += tick;
+            // Prevent catch-up spiral (e.g. after system sleep)
+            let now = Instant::now();
+            if now.duration_since(last_tick) > tick * 2 {
+                last_tick = now;
+            }
         }
     }
 
