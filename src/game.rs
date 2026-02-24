@@ -326,11 +326,10 @@ impl Game {
             return;
         }
 
-        let fits = self
-            .snake
-            .body
-            .iter()
-            .all(|seg| seg.x > 0 && seg.x < new_width - 1 && seg.y > 0 && seg.y < new_height - 1);
+        let fits =
+            self.snake.body.iter().all(|seg| {
+                seg.x > 0 && seg.x < new_width - 1 && seg.y > 0 && seg.y < new_height - 1
+            });
 
         if !fits {
             self.set_game_over();
