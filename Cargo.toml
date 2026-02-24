@@ -1,6 +1,6 @@
 [package]
 name = "rust-snake"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "A classic Snake game for the terminal, written in Rust"
@@ -8,8 +8,10 @@ repository = "https://github.com/blugart-dev/rust-snake"
 readme = "README.md"
 keywords = ["snake", "game", "terminal", "cli", "crossterm"]
 categories = ["games", "command-line-utilities"]
+exclude = [".github/", ".claude/", "plan.md"]
 
 [dependencies]
+clap = { version = "4.5.60", features = ["derive"] }
 crossterm = "0.29.0"
 dirs = "6.0.0"
 rand = "0.10.0"

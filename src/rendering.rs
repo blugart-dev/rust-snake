@@ -13,6 +13,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::constants::CELL_WIDTH;
 use crate::game::{Game, GameState};
+use crate::theme::Theme;
 
 // ── Box-drawing characters ──────────────────────────────────────────────────
 
@@ -30,14 +31,6 @@ const SNAKE_BODY: &str = "▓";
 const FOOD_CHAR: &str = "●";
 const BONUS_CHAR: &str = "★";
 
-// ── Color palette ──────────────────────────────────────────────────────────
-
-const WALL_COLOR: Color = Color::DarkGrey;
-const HEAD_COLOR: Color = Color::Green;
-const BODY_COLOR: Color = Color::DarkGreen;
-const FOOD_COLOR: Color = Color::Red;
-const BONUS_COLOR: Color = Color::Magenta;
-
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /// Converts a logical game cell to a terminal cursor column and row.
@@ -54,25 +47,25 @@ fn terminal_width(board_width: u16) -> u16 {
 
 /// Renders the full game frame. All draw commands are queued into a single
 /// buffer and flushed once at the end to prevent flickering.
-pub fn draw(game: &Game, w: &mut impl Write) -> io::Result<()> {
-    draw_border(game, w)?;
+pub fn draw(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
+    draw_border(game, w, theme)?;
     draw_interior(game, w)?;
 
     match game.state {
         GameState::Menu => {
-            draw_menu(game, w)?;
+            draw_menu(game, w, theme)?;
         }
         _ => {
-            draw_food(game, w)?;
-            draw_snake(game, w)?;
-            draw_status_bar(game, w)?;
+            draw_food(game, w, theme)?;
+            draw_snake(game, w, theme)?;
+            draw_status_bar(game, w, theme)?;
 
             match game.state {
                 GameState::Paused => {
                     draw_overlay(game, w, &[("--- PAUSED ---".into(), Color::Yellow)])?;
                 }
                 GameState::Dying(frame) => {
-                    draw_snake_death(game, w, frame % 2 == 0)?;
+                    draw_snake_death(game, w, theme, frame % 2 == 0)?;
                 }
                 GameState::GameOver => {
                     let is_new_high = game.score > 0 && game.score >= game.high_score;
@@ -134,7 +127,7 @@ pub fn draw(game: &Game, w: &mut impl Write) -> io::Result<()> {
 // ── Internal draw helpers ──────────────────────────────────────────────────
 
 /// Draws the double-line box border around the board.
-fn draw_border(game: &Game, w: &mut impl Write) -> io::Result<()> {
+fn draw_border(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
     let tw = terminal_width(game.width);
     // Each corner occupies 1 column; the remaining (CELL_WIDTH - 1) columns
     // of the wall cells are filled with horizontal wall segments.
@@ -142,7 +135,7 @@ fn draw_border(game: &Game, w: &mut impl Write) -> io::Result<()> {
     let h_cell = WALL_H.repeat(CELL_WIDTH as usize);
     let h_inner = h_cell.repeat((game.width - 2) as usize);
 
-    queue!(w, SetForegroundColor(WALL_COLOR))?;
+    queue!(w, SetForegroundColor(theme.wall))?;
 
     queue!(
         w,
@@ -175,12 +168,12 @@ fn draw_interior(game: &Game, w: &mut impl Write) -> io::Result<()> {
 }
 
 /// Draws the regular food pellet and, if active, the bonus food item.
-fn draw_food(game: &Game, w: &mut impl Write) -> io::Result<()> {
+fn draw_food(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
     let (tx, ty) = cell_to_terminal(game.food.x, game.food.y);
     queue!(
         w,
         cursor::MoveTo(tx, ty),
-        SetForegroundColor(FOOD_COLOR),
+        SetForegroundColor(theme.food),
         Print(FOOD_CHAR),
         Print(FOOD_CHAR),
     )?;
@@ -190,7 +183,7 @@ fn draw_food(game: &Game, w: &mut impl Write) -> io::Result<()> {
         queue!(
             w,
             cursor::MoveTo(tx, ty),
-            SetForegroundColor(BONUS_COLOR),
+            SetForegroundColor(theme.bonus),
             Print(BONUS_CHAR),
             Print(BONUS_CHAR),
         )?;
@@ -200,12 +193,12 @@ fn draw_food(game: &Game, w: &mut impl Write) -> io::Result<()> {
 }
 
 /// Draws every segment of the snake (head in a distinct color).
-fn draw_snake(game: &Game, w: &mut impl Write) -> io::Result<()> {
+fn draw_snake(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
     for (i, seg) in game.snake.body.iter().enumerate() {
         let (ch, color) = if i == 0 {
-            (SNAKE_HEAD, HEAD_COLOR)
+            (SNAKE_HEAD, theme.head)
         } else {
-            (SNAKE_BODY, BODY_COLOR)
+            (SNAKE_BODY, theme.body)
         };
         let (tx, ty) = cell_to_terminal(seg.x, seg.y);
         queue!(
@@ -219,9 +212,13 @@ fn draw_snake(game: &Game, w: &mut impl Write) -> io::Result<()> {
     Ok(())
 }
 
-/// Redraws the snake in alternating red tones for the death flash effect.
-fn draw_snake_death(game: &Game, w: &mut impl Write, flash: bool) -> io::Result<()> {
-    let color = if flash { Color::Red } else { Color::DarkRed };
+/// Redraws the snake in alternating tones for the death flash effect.
+fn draw_snake_death(game: &Game, w: &mut impl Write, theme: &Theme, flash: bool) -> io::Result<()> {
+    let color = if flash {
+        theme.death_flash
+    } else {
+        theme.death_dark
+    };
     for seg in game.snake.body.iter() {
         let (tx, ty) = cell_to_terminal(seg.x, seg.y);
         queue!(
@@ -236,7 +233,7 @@ fn draw_snake_death(game: &Game, w: &mut impl Write, flash: bool) -> io::Result<
 }
 
 /// Draws the HUD row below the board (score, high score, level, controls).
-fn draw_status_bar(game: &Game, w: &mut impl Write) -> io::Result<()> {
+fn draw_status_bar(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
     let tw = terminal_width(game.width);
     let clear = " ".repeat(tw as usize);
     queue!(w, cursor::MoveTo(0, game.height), Print(&clear))?;
@@ -245,15 +242,15 @@ fn draw_status_bar(game: &Game, w: &mut impl Write) -> io::Result<()> {
     queue!(
         w,
         cursor::MoveTo(0, game.height),
-        SetForegroundColor(Color::Yellow),
+        SetForegroundColor(theme.status_score),
         Print(format!(" Score: {} ", game.score)),
         SetForegroundColor(Color::DarkGrey),
         Print("·"),
-        SetForegroundColor(Color::Magenta),
+        SetForegroundColor(theme.status_best),
         Print(format!(" Best: {} ", game.high_score)),
         SetForegroundColor(Color::DarkGrey),
         Print("·"),
-        SetForegroundColor(Color::Cyan),
+        SetForegroundColor(theme.status_level),
         Print(format!(" Lv.{level} ")),
         SetForegroundColor(Color::DarkGrey),
         Print("·"),
@@ -285,7 +282,7 @@ fn draw_overlay(game: &Game, w: &mut impl Write, lines: &[(String, Color)]) -> i
 }
 
 /// Draws the title screen with ASCII art, controls, and high score.
-fn draw_menu(game: &Game, w: &mut impl Write) -> io::Result<()> {
+fn draw_menu(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
     let tw = terminal_width(game.width);
     let cx = tw / 2;
 
@@ -297,7 +294,7 @@ fn draw_menu(game: &Game, w: &mut impl Write) -> io::Result<()> {
     ];
 
     let title_y = game.height / 5;
-    queue!(w, SetForegroundColor(Color::Green))?;
+    queue!(w, SetForegroundColor(theme.title))?;
     for (i, line) in title.iter().enumerate() {
         let x = cx.saturating_sub(line.width() as u16 / 2);
         queue!(w, cursor::MoveTo(x, title_y + i as u16), Print(line))?;
@@ -327,7 +324,7 @@ fn draw_menu(game: &Game, w: &mut impl Write) -> io::Result<()> {
         queue!(
             w,
             cursor::MoveTo(x, info_y + info.len() as u16 + 1),
-            SetForegroundColor(Color::Magenta),
+            SetForegroundColor(theme.status_best),
             Print(hs),
         )?;
     }
@@ -341,8 +338,9 @@ mod tests {
     use crate::game::Game;
 
     fn render_to_string(game: &Game) -> String {
+        let theme = Theme::from_name(crate::theme::ThemeName::Classic);
         let mut buf = Vec::new();
-        draw(game, &mut buf).unwrap();
+        draw(game, &mut buf, &theme).unwrap();
         String::from_utf8_lossy(&buf).to_string()
     }
 

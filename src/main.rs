@@ -4,28 +4,64 @@ mod constants;
 mod game;
 mod rendering;
 mod snake;
+mod theme;
 
 use std::io;
 use std::time::{Duration, Instant};
 
+use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use crossterm::{cursor, execute, terminal};
+use crossterm::style::Print;
+use crossterm::{cursor, execute, queue, terminal};
 
 use constants::{
     CELL_WIDTH, DEFAULT_TICK_MS, DYING_TICK_MS, MAX_BOARD_H, MAX_BOARD_W, MIN_BOARD_H, MIN_BOARD_W,
 };
 use game::{Game, GameState};
 use snake::Direction;
+use theme::{Theme, ThemeName};
 
-/// Computes board dimensions from the terminal size.
-fn compute_board_size() -> (u16, u16) {
+/// A classic Snake game for the terminal.
+#[derive(Parser)]
+#[command(version, about)]
+struct Args {
+    /// Board width in logical cells (overrides auto-detection).
+    #[arg(long, value_name = "CELLS")]
+    width: Option<u16>,
+
+    /// Board height in logical cells (overrides auto-detection).
+    #[arg(long, value_name = "CELLS")]
+    height: Option<u16>,
+
+    /// Color theme: classic, neon, or monochrome.
+    #[arg(long, value_enum, default_value_t)]
+    theme: ThemeName,
+
+    /// Disable terminal bell sound on food pickup and death.
+    #[arg(long)]
+    no_bell: bool,
+}
+
+/// Computes board dimensions from the terminal size, with optional overrides.
+fn compute_board_size(args: &Args) -> (u16, u16) {
     let (term_cols, term_rows) = terminal::size().unwrap_or((80, 24));
-    let board_w = (term_cols / CELL_WIDTH).clamp(MIN_BOARD_W, MAX_BOARD_W);
-    let board_h = term_rows.saturating_sub(1).clamp(MIN_BOARD_H, MAX_BOARD_H);
+
+    let board_w = args
+        .width
+        .unwrap_or(term_cols / CELL_WIDTH)
+        .clamp(MIN_BOARD_W, MAX_BOARD_W);
+    let board_h = args
+        .height
+        .unwrap_or(term_rows.saturating_sub(1))
+        .clamp(MIN_BOARD_H, MAX_BOARD_H);
+
     (board_w, board_h)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    let theme = Theme::from_name(args.theme);
+
     // Restore the terminal even on panic (raw mode would otherwise leave it unusable).
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -35,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }));
 
     let mut stdout = io::stdout();
-    let (board_w, board_h) = compute_board_size();
+    let (board_w, board_h) = compute_board_size(&args);
     let mut game = Game::new(board_w, board_h);
 
     terminal::enable_raw_mode()?;
@@ -45,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = Instant::now();
 
     loop {
-        rendering::draw(&game, &mut stdout)?;
+        rendering::draw(&game, &mut stdout, &theme)?;
 
         // Determine tick interval based on game state
         let tick = match game.state {
@@ -68,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Enter => game.start(),
                     KeyCode::Char('p') => game.toggle_pause(),
                     KeyCode::Char('r') => {
-                        let (w, h) = compute_board_size();
+                        let (w, h) = compute_board_size(&args);
                         game.restart(w, h);
                     }
 
@@ -80,14 +116,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 },
                 Event::Resize(_, _) => {
-                    let (w, h) = compute_board_size();
+                    let (w, h) = compute_board_size(&args);
                     match game.state {
-                        GameState::Playing => game.toggle_pause(),
+                        GameState::Playing => {
+                            game.toggle_pause();
+                            game.resize(w, h);
+                        }
+                        GameState::Paused => {
+                            game.resize(w, h);
+                        }
                         GameState::Menu => game = Game::new(w, h),
-                        GameState::Paused
-                        | GameState::Dying(_)
-                        | GameState::GameOver
-                        | GameState::Win => {} // no-op: game board is fixed once started
+                        GameState::Dying(_) | GameState::GameOver | GameState::Win => {}
                     }
                 }
                 _ => {}
@@ -96,8 +135,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Only advance the game when the tick interval has fully elapsed
         if last_tick.elapsed() >= tick {
-            game.update();
-            last_tick = Instant::now();
+            let events = game.update();
+
+            // Audio feedback via terminal bell
+            if !args.no_bell && (events.ate_food || events.ate_bonus || events.died) {
+                queue!(stdout, Print("\x07"))?;
+            }
+
+            last_tick += tick;
+            // Prevent catch-up spiral (e.g. after system sleep)
+            let now = Instant::now();
+            if now.duration_since(last_tick) > tick * 2 {
+                last_tick = now;
+            }
         }
     }
 
