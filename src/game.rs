@@ -316,6 +316,50 @@ impl Game {
         }
     }
 
+    /// Resizes the board during `Playing` or `Paused` states.
+    ///
+    /// If all game objects (snake, food, bonus) fit within the new dimensions,
+    /// the board is resized in place. If any snake segment would be out of
+    /// bounds, the death sequence is triggered instead.
+    pub fn resize(&mut self, new_width: u16, new_height: u16) {
+        if self.state != GameState::Playing && self.state != GameState::Paused {
+            return;
+        }
+
+        let fits = self
+            .snake
+            .body
+            .iter()
+            .all(|seg| seg.x > 0 && seg.x < new_width - 1 && seg.y > 0 && seg.y < new_height - 1);
+
+        if !fits {
+            self.set_game_over();
+            return;
+        }
+
+        self.width = new_width;
+        self.height = new_height;
+
+        // Respawn food if it landed outside the new bounds
+        if self.food.x == 0
+            || self.food.x >= new_width - 1
+            || self.food.y == 0
+            || self.food.y >= new_height - 1
+        {
+            self.spawn_food();
+        }
+
+        // Remove bonus food if it's outside the new bounds
+        if let Some(ref bonus) = self.bonus_food
+            && (bonus.pos.x == 0
+                || bonus.pos.x >= new_width - 1
+                || bonus.pos.y == 0
+                || bonus.pos.y >= new_height - 1)
+        {
+            self.bonus_food = None;
+        }
+    }
+
     /// Resets the game, preserving the high score.
     pub fn restart(&mut self, width: u16, height: u16) {
         if self.state != GameState::GameOver && self.state != GameState::Win {
@@ -762,5 +806,59 @@ mod tests {
         game.snake.direction = Direction::Up;
         game.update();
         assert!(game.just_died, "just_died should be true after collision");
+    }
+
+    // ── Resize tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn resize_larger_keeps_snake() {
+        let mut game = test_game();
+        let head = *game.snake.head();
+        game.resize(40, 30);
+        assert_eq!(game.width, 40);
+        assert_eq!(game.height, 30);
+        assert_eq!(*game.snake.head(), head);
+        assert_eq!(game.state, GameState::Playing);
+    }
+
+    #[test]
+    fn resize_smaller_snake_fits() {
+        let mut game = test_game();
+        // Snake starts at center of 30x20, so it fits in 20x15
+        game.snake = Snake::new(10, 7);
+        game.resize(20, 15);
+        assert_eq!(game.width, 20);
+        assert_eq!(game.height, 15);
+        assert_eq!(game.state, GameState::Playing);
+    }
+
+    #[test]
+    fn resize_smaller_snake_out_of_bounds_triggers_dying() {
+        let mut game = test_game();
+        // Place snake near the right edge
+        game.snake = Snake::new(25, 10);
+        // Shrink board so snake is outside
+        game.resize(20, 15);
+        assert!(matches!(game.state, GameState::Dying(_)));
+    }
+
+    #[test]
+    fn resize_respawns_food_if_out_of_bounds() {
+        let mut game = test_game();
+        game.snake = Snake::new(10, 7);
+        game.food = Position::new(28, 18); // near far corner
+        game.resize(20, 15);
+        // Food should now be inside the new board
+        assert!(game.food.x > 0 && game.food.x < 19);
+        assert!(game.food.y > 0 && game.food.y < 14);
+    }
+
+    #[test]
+    fn resize_noop_during_game_over() {
+        let mut game = test_game();
+        game.state = GameState::GameOver;
+        game.resize(40, 30);
+        assert_eq!(game.width, 30); // unchanged from original
+        assert_eq!(game.state, GameState::GameOver);
     }
 }

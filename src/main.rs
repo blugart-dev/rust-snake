@@ -124,12 +124,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Resize(_, _) => {
                     let (w, h) = compute_board_size(&args);
                     match game.state {
-                        GameState::Playing => game.toggle_pause(),
+                        GameState::Playing => {
+                            game.toggle_pause();
+                            game.resize(w, h);
+                        }
+                        GameState::Paused => {
+                            game.resize(w, h);
+                        }
                         GameState::Menu => game = Game::new(w, h),
-                        GameState::Paused
-                        | GameState::Dying(_)
-                        | GameState::GameOver
-                        | GameState::Win => {} // no-op: game board is fixed once started
+                        GameState::Dying(_) | GameState::GameOver | GameState::Win => {}
                     }
                 }
                 _ => {}
