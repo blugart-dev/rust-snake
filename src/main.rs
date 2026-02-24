@@ -8,6 +8,7 @@ mod snake;
 use std::io;
 use std::time::{Duration, Instant};
 
+use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::{cursor, execute, terminal};
 
@@ -17,15 +18,38 @@ use constants::{
 use game::{Game, GameState};
 use snake::Direction;
 
-/// Computes board dimensions from the terminal size.
-fn compute_board_size() -> (u16, u16) {
+/// A classic Snake game for the terminal.
+#[derive(Parser)]
+#[command(version, about)]
+struct Args {
+    /// Board width in logical cells (overrides auto-detection).
+    #[arg(long, value_name = "CELLS")]
+    width: Option<u16>,
+
+    /// Board height in logical cells (overrides auto-detection).
+    #[arg(long, value_name = "CELLS")]
+    height: Option<u16>,
+}
+
+/// Computes board dimensions from the terminal size, with optional overrides.
+fn compute_board_size(args: &Args) -> (u16, u16) {
     let (term_cols, term_rows) = terminal::size().unwrap_or((80, 24));
-    let board_w = (term_cols / CELL_WIDTH).clamp(MIN_BOARD_W, MAX_BOARD_W);
-    let board_h = term_rows.saturating_sub(1).clamp(MIN_BOARD_H, MAX_BOARD_H);
+
+    let board_w = args
+        .width
+        .unwrap_or(term_cols / CELL_WIDTH)
+        .clamp(MIN_BOARD_W, MAX_BOARD_W);
+    let board_h = args
+        .height
+        .unwrap_or(term_rows.saturating_sub(1))
+        .clamp(MIN_BOARD_H, MAX_BOARD_H);
+
     (board_w, board_h)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
     // Restore the terminal even on panic (raw mode would otherwise leave it unusable).
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -35,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }));
 
     let mut stdout = io::stdout();
-    let (board_w, board_h) = compute_board_size();
+    let (board_w, board_h) = compute_board_size(&args);
     let mut game = Game::new(board_w, board_h);
 
     terminal::enable_raw_mode()?;
@@ -68,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Enter => game.start(),
                     KeyCode::Char('p') => game.toggle_pause(),
                     KeyCode::Char('r') => {
-                        let (w, h) = compute_board_size();
+                        let (w, h) = compute_board_size(&args);
                         game.restart(w, h);
                     }
 
@@ -80,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 },
                 Event::Resize(_, _) => {
-                    let (w, h) = compute_board_size();
+                    let (w, h) = compute_board_size(&args);
                     match game.state {
                         GameState::Playing => game.toggle_pause(),
                         GameState::Menu => game = Game::new(w, h),
