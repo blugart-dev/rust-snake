@@ -1,15 +1,17 @@
 //! Core game logic: state machine, collision, scoring, and food management.
 
+use std::collections::HashSet;
 #[cfg(not(test))]
 use std::fs;
 #[cfg(not(test))]
 use std::path::PathBuf;
-use std::collections::HashSet;
 use std::time::Duration;
 
 use rand::RngExt;
 
-use crate::constants::{BASE_TICK_MS, MIN_TICK_MS, SPEED_STEP_MS, BONUS_SPAWN_INTERVAL, BONUS_DURATION, BONUS_POINTS};
+use crate::constants::{
+    BASE_TICK_MS, BONUS_DURATION, BONUS_POINTS, BONUS_SPAWN_INTERVAL, MIN_TICK_MS, SPEED_STEP_MS,
+};
 use crate::snake::{Direction, Position, Snake};
 
 // ── State ───────────────────────────────────────────────────────────────────
@@ -84,7 +86,9 @@ fn save_high_score(score: usize) {
 }
 
 #[cfg(test)]
-fn load_high_score() -> usize { 0 }
+fn load_high_score() -> usize {
+    0
+}
 
 #[cfg(test)]
 fn save_high_score(_score: usize) {}
@@ -134,9 +138,7 @@ impl Game {
         let occupied: HashSet<Position> = self.snake.body.iter().copied().collect();
         (1..self.width - 1)
             .flat_map(|x| (1..self.height - 1).map(move |y| Position::new(x, y)))
-            .filter(|pos| {
-                Some(*pos) != exclude && !occupied.contains(pos)
-            })
+            .filter(|pos| Some(*pos) != exclude && !occupied.contains(pos))
             .collect()
     }
 
@@ -225,15 +227,18 @@ impl Game {
 
         let head = *self.snake.head();
         let new_head = match self.snake.direction {
-            Direction::Up    => Position::new(head.x, head.y.wrapping_sub(1)),
-            Direction::Down  => Position::new(head.x, head.y + 1),
-            Direction::Left  => Position::new(head.x.wrapping_sub(1), head.y),
+            Direction::Up => Position::new(head.x, head.y.wrapping_sub(1)),
+            Direction::Down => Position::new(head.x, head.y + 1),
+            Direction::Left => Position::new(head.x.wrapping_sub(1), head.y),
             Direction::Right => Position::new(head.x + 1, head.y),
         };
 
         // Wall collision (checked before inserting head)
-        if new_head.x == 0 || new_head.x >= self.width - 1
-        || new_head.y == 0 || new_head.y >= self.height - 1 {
+        if new_head.x == 0
+            || new_head.x >= self.width - 1
+            || new_head.y == 0
+            || new_head.y >= self.height - 1
+        {
             self.snake.body.push_front(new_head);
             self.set_game_over();
             return;
@@ -290,7 +295,7 @@ impl Game {
     pub fn toggle_pause(&mut self) {
         match self.state {
             GameState::Playing => self.state = GameState::Paused,
-            GameState::Paused  => self.state = GameState::Playing,
+            GameState::Paused => self.state = GameState::Playing,
             _ => {}
         }
     }
@@ -470,7 +475,10 @@ mod tests {
                 break;
             }
         }
-        assert!(bonus_appeared, "Bonus food should eventually spawn after interval");
+        assert!(
+            bonus_appeared,
+            "Bonus food should eventually spawn after interval"
+        );
     }
 
     #[test]
@@ -487,7 +495,10 @@ mod tests {
         game.update(); // ticks_remaining: 1 → 0
         assert!(game.bonus_food.is_some());
         game.update(); // ticks_remaining == 0, removed
-        assert!(game.bonus_food.is_none(), "Bonus food should disappear after its duration");
+        assert!(
+            game.bonus_food.is_none(),
+            "Bonus food should disappear after its duration"
+        );
     }
 
     #[test]
@@ -525,7 +536,10 @@ mod tests {
         });
         game.snake.direction = Direction::Right;
         game.update();
-        assert_eq!(game.score, BONUS_POINTS, "Eating bonus food should award BONUS_POINTS");
+        assert_eq!(
+            game.score, BONUS_POINTS,
+            "Eating bonus food should award BONUS_POINTS"
+        );
         assert!(game.bonus_food.is_none(), "Bonus food should be consumed");
     }
 
@@ -548,7 +562,11 @@ mod tests {
         game.snake.direction = Direction::Down;
 
         game.update();
-        assert_eq!(game.state, GameState::Win, "Filling the board should trigger Win");
+        assert_eq!(
+            game.state,
+            GameState::Win,
+            "Filling the board should trigger Win"
+        );
     }
 
     // ── Restart rejection tests ────────────────────────────────────────
@@ -557,7 +575,11 @@ mod tests {
     fn restart_rejected_during_playing() {
         let mut game = test_game();
         game.restart(30, 20);
-        assert_eq!(game.state, GameState::Playing, "Restart should be ignored during Playing");
+        assert_eq!(
+            game.state,
+            GameState::Playing,
+            "Restart should be ignored during Playing"
+        );
     }
 
     #[test]
@@ -565,14 +587,22 @@ mod tests {
         let mut game = test_game();
         game.state = GameState::Paused;
         game.restart(30, 20);
-        assert_eq!(game.state, GameState::Paused, "Restart should be ignored during Paused");
+        assert_eq!(
+            game.state,
+            GameState::Paused,
+            "Restart should be ignored during Paused"
+        );
     }
 
     #[test]
     fn restart_rejected_during_menu() {
         let mut game = Game::new(30, 20);
         game.restart(30, 20);
-        assert_eq!(game.state, GameState::Menu, "Restart should be ignored during Menu");
+        assert_eq!(
+            game.state,
+            GameState::Menu,
+            "Restart should be ignored during Menu"
+        );
     }
 
     #[test]
@@ -580,7 +610,11 @@ mod tests {
         let mut game = test_game();
         game.state = GameState::GameOver;
         game.restart(30, 20);
-        assert_eq!(game.state, GameState::Playing, "Restart should work during GameOver");
+        assert_eq!(
+            game.state,
+            GameState::Playing,
+            "Restart should work during GameOver"
+        );
         assert_eq!(game.score, 0);
     }
 
@@ -589,7 +623,11 @@ mod tests {
         let mut game = test_game();
         game.state = GameState::Win;
         game.restart(30, 20);
-        assert_eq!(game.state, GameState::Playing, "Restart should work during Win");
+        assert_eq!(
+            game.state,
+            GameState::Playing,
+            "Restart should work during Win"
+        );
         assert_eq!(game.score, 0);
     }
 
@@ -646,7 +684,11 @@ mod tests {
         let old_len = game.snake.body.len();
         game.update();
         assert_eq!(*game.snake.head(), Position::new(head.x + 1, head.y));
-        assert_eq!(game.snake.body.len(), old_len, "Snake should not grow without eating");
+        assert_eq!(
+            game.snake.body.len(),
+            old_len,
+            "Snake should not grow without eating"
+        );
     }
 
     #[test]
@@ -655,7 +697,11 @@ mod tests {
         let head = *game.snake.head();
         game.update();
         assert_eq!(game.state, GameState::Menu);
-        assert_eq!(*game.snake.head(), head, "Snake should not move during Menu");
+        assert_eq!(
+            *game.snake.head(),
+            head,
+            "Snake should not move during Menu"
+        );
     }
 
     #[test]
@@ -665,6 +711,10 @@ mod tests {
         game.state = GameState::Paused;
         game.update();
         assert_eq!(game.state, GameState::Paused);
-        assert_eq!(*game.snake.head(), head, "Snake should not move during Paused");
+        assert_eq!(
+            *game.snake.head(),
+            head,
+            "Snake should not move during Paused"
+        );
     }
 }

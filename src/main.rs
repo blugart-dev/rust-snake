@@ -1,19 +1,21 @@
 //! Entry point: terminal setup, game loop, and input dispatch.
 
 mod constants;
-mod snake;
 mod game;
 mod rendering;
+mod snake;
 
 use std::io;
 use std::time::{Duration, Instant};
 
-use crossterm::{cursor, execute, terminal};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::{cursor, execute, terminal};
 
-use constants::{MIN_BOARD_W, MAX_BOARD_W, MIN_BOARD_H, MAX_BOARD_H, CELL_WIDTH, DYING_TICK_MS, DEFAULT_TICK_MS};
-use snake::Direction;
+use constants::{
+    CELL_WIDTH, DEFAULT_TICK_MS, DYING_TICK_MS, MAX_BOARD_H, MAX_BOARD_W, MIN_BOARD_H, MIN_BOARD_W,
+};
 use game::{Game, GameState};
+use snake::Direction;
 
 /// Computes board dimensions from the terminal size.
 fn compute_board_size() -> (u16, u16) {
@@ -70,9 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         game.restart(w, h);
                     }
 
-                    KeyCode::Up    | KeyCode::Char('w') => game.change_direction(Direction::Up),
-                    KeyCode::Down  | KeyCode::Char('s') => game.change_direction(Direction::Down),
-                    KeyCode::Left  | KeyCode::Char('a') => game.change_direction(Direction::Left),
+                    KeyCode::Up | KeyCode::Char('w') => game.change_direction(Direction::Up),
+                    KeyCode::Down | KeyCode::Char('s') => game.change_direction(Direction::Down),
+                    KeyCode::Left | KeyCode::Char('a') => game.change_direction(Direction::Left),
                     KeyCode::Right | KeyCode::Char('d') => game.change_direction(Direction::Right),
 
                     _ => {}

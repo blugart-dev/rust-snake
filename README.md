@@ -3,6 +3,7 @@
 A classic Snake game for the terminal, written in Rust.
 
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-orange)
+[![CI](https://github.com/blugart-dev/rust-snake/actions/workflows/ci.yml/badge.svg)](https://github.com/blugart-dev/rust-snake/actions/workflows/ci.yml)
 
 ## Features
 
@@ -19,11 +20,17 @@ A classic Snake game for the terminal, written in Rust.
 - Rust 1.85+ (edition 2024)
 - A terminal that supports ANSI escape codes and Unicode
 
-## Getting Started
+## Installation
+
+### From source
 
 ```sh
 cargo run
 ```
+
+### Pre-built binaries
+
+Download the latest release for your platform from the [Releases](https://github.com/blugart-dev/rust-snake/releases) page. Available for Linux (x86_64), macOS (x86_64, aarch64), and Windows (x86_64).
 
 ## Controls
 

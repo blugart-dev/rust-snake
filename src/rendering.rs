@@ -20,22 +20,22 @@ const WALL_TL: &str = "╔";
 const WALL_TR: &str = "╗";
 const WALL_BL: &str = "╚";
 const WALL_BR: &str = "╝";
-const WALL_H: &str  = "═";
-const WALL_V: &str  = "║";
+const WALL_H: &str = "═";
+const WALL_V: &str = "║";
 
 // ── Sprite characters ──────────────────────────────────────────────────────
 
 const SNAKE_HEAD: &str = "█";
 const SNAKE_BODY: &str = "▓";
-const FOOD_CHAR: &str  = "●";
+const FOOD_CHAR: &str = "●";
 const BONUS_CHAR: &str = "★";
 
 // ── Color palette ──────────────────────────────────────────────────────────
 
-const WALL_COLOR: Color  = Color::DarkGrey;
-const HEAD_COLOR: Color  = Color::Green;
-const BODY_COLOR: Color  = Color::DarkGreen;
-const FOOD_COLOR: Color  = Color::Red;
+const WALL_COLOR: Color = Color::DarkGrey;
+const HEAD_COLOR: Color = Color::Green;
+const BODY_COLOR: Color = Color::DarkGreen;
+const FOOD_COLOR: Color = Color::Red;
 const BONUS_COLOR: Color = Color::Magenta;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,9 +69,7 @@ pub fn draw(game: &Game, w: &mut impl Write) -> io::Result<()> {
 
             match game.state {
                 GameState::Paused => {
-                    draw_overlay(game, w, &[
-                        ("--- PAUSED ---".into(), Color::Yellow),
-                    ])?;
+                    draw_overlay(game, w, &[("--- PAUSED ---".into(), Color::Yellow)])?;
                 }
                 GameState::Dying(frame) => {
                     draw_snake_death(game, w, frame % 2 == 0)?;
@@ -86,8 +84,15 @@ pub fn draw(game: &Game, w: &mut impl Write) -> io::Result<()> {
                         lines.push(("NEW HIGH SCORE!".into(), Color::Yellow));
                         lines.push((String::new(), Color::White));
                     }
-                    lines.push((format!("Score: {}  Length: {}  Level: {}",
-                        game.score, game.snake.body.len(), game.level()), Color::Yellow));
+                    lines.push((
+                        format!(
+                            "Score: {}  Length: {}  Level: {}",
+                            game.score,
+                            game.snake.body.len(),
+                            game.level()
+                        ),
+                        Color::Yellow,
+                    ));
                     lines.push((String::new(), Color::White));
                     lines.push(("[R] Play Again".into(), Color::White));
                     lines.push(("[Q] Quit".into(), Color::DarkGrey));
@@ -97,8 +102,15 @@ pub fn draw(game: &Game, w: &mut impl Write) -> io::Result<()> {
                     let mut lines: Vec<(String, Color)> = vec![
                         ("YOU WIN!".into(), Color::Green),
                         (String::new(), Color::White),
-                        (format!("Score: {}  Length: {}  Level: {}",
-                            game.score, game.snake.body.len(), game.level()), Color::Yellow),
+                        (
+                            format!(
+                                "Score: {}  Length: {}  Level: {}",
+                                game.score,
+                                game.snake.body.len(),
+                                game.level()
+                            ),
+                            Color::Yellow,
+                        ),
                         (String::new(), Color::White),
                         ("[R] Play Again".into(), Color::White),
                         ("[Q] Quit".into(), Color::DarkGrey),
@@ -169,7 +181,8 @@ fn draw_food(game: &Game, w: &mut impl Write) -> io::Result<()> {
         w,
         cursor::MoveTo(tx, ty),
         SetForegroundColor(FOOD_COLOR),
-        Print(FOOD_CHAR), Print(FOOD_CHAR),
+        Print(FOOD_CHAR),
+        Print(FOOD_CHAR),
     )?;
 
     if let Some(ref bonus) = game.bonus_food {
@@ -178,7 +191,8 @@ fn draw_food(game: &Game, w: &mut impl Write) -> io::Result<()> {
             w,
             cursor::MoveTo(tx, ty),
             SetForegroundColor(BONUS_COLOR),
-            Print(BONUS_CHAR), Print(BONUS_CHAR),
+            Print(BONUS_CHAR),
+            Print(BONUS_CHAR),
         )?;
     }
 
@@ -198,7 +212,8 @@ fn draw_snake(game: &Game, w: &mut impl Write) -> io::Result<()> {
             w,
             cursor::MoveTo(tx, ty),
             SetForegroundColor(color),
-            Print(ch), Print(ch),
+            Print(ch),
+            Print(ch),
         )?;
     }
     Ok(())
@@ -213,7 +228,8 @@ fn draw_snake_death(game: &Game, w: &mut impl Write, flash: bool) -> io::Result<
             w,
             cursor::MoveTo(tx, ty),
             SetForegroundColor(color),
-            Print(SNAKE_BODY), Print(SNAKE_BODY),
+            Print(SNAKE_BODY),
+            Print(SNAKE_BODY),
         )?;
     }
     Ok(())
@@ -335,14 +351,20 @@ mod tests {
         let game = Game::new(30, 20);
         let output = render_to_string(&game);
         // The title is ASCII art; check for a recognizable fragment
-        assert!(output.contains("___"), "Menu should contain ASCII art title");
+        assert!(
+            output.contains("___"),
+            "Menu should contain ASCII art title"
+        );
     }
 
     #[test]
     fn menu_render_contains_start_prompt() {
         let game = Game::new(30, 20);
         let output = render_to_string(&game);
-        assert!(output.contains("ENTER"), "Menu should prompt to press ENTER");
+        assert!(
+            output.contains("ENTER"),
+            "Menu should prompt to press ENTER"
+        );
     }
 
     #[test]
@@ -366,7 +388,10 @@ mod tests {
         let mut game = Game::new(30, 20);
         game.state = GameState::GameOver;
         let output = render_to_string(&game);
-        assert!(output.contains("GAME OVER"), "GameOver state should show GAME OVER");
+        assert!(
+            output.contains("GAME OVER"),
+            "GameOver state should show GAME OVER"
+        );
     }
 
     #[test]

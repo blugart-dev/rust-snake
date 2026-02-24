@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Test single:** `cargo test <test_name>` (e.g., `cargo test wall_collision_triggers_dying`)
 - **Check (no codegen):** `cargo check`
 - **Clippy:** `cargo clippy`
+- **Format check:** `cargo fmt --check`
 
 ## Architecture
 
@@ -34,3 +35,8 @@ Terminal-based Snake game written in Rust (edition 2024) using crossterm for ter
 - Food spawning uses random rejection sampling when the board is sparse, switches to collecting free cells when >50% occupied.
 - Bonus food spawns probabilistically (40% chance) every `BONUS_SPAWN_INTERVAL` ticks, lasts `BONUS_DURATION` ticks.
 - The `Dying` state plays a 6-frame red flash animation before transitioning to `GameOver`.
+
+### CI/CD
+
+- **CI** (`.github/workflows/ci.yml`): Runs on every push to `main` and all PRs. Executes `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` across Ubuntu, macOS, and Windows.
+- **Release** (`.github/workflows/release.yml`): Triggered by `v*` tags. Builds release binaries for 4 targets (`x86_64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`), packages them with LICENSE and README, and publishes a GitHub Release with all archives.
