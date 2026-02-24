@@ -1,6 +1,19 @@
 //! Color themes for the game.
 
+use clap::ValueEnum;
 use crossterm::style::Color;
+
+/// Available color theme names, parsed directly by clap.
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum ThemeName {
+    /// Green-on-dark palette (the original).
+    #[default]
+    Classic,
+    /// Bright cyan/blue/yellow arcade colors.
+    Neon,
+    /// Greyscale for minimal terminals.
+    Monochrome,
+}
 
 /// A complete color palette for the game.
 pub struct Theme {
@@ -10,14 +23,24 @@ pub struct Theme {
     pub food: Color,
     pub bonus: Color,
     pub title: Color,
+    pub death_flash: Color,
+    pub death_dark: Color,
     pub status_score: Color,
     pub status_best: Color,
     pub status_level: Color,
 }
 
 impl Theme {
-    /// The default green-on-dark palette matching the original game.
-    pub fn classic() -> Self {
+    /// Builds a [`Theme`] from the CLI-selected name.
+    pub fn from_name(name: ThemeName) -> Self {
+        match name {
+            ThemeName::Classic => Self::classic(),
+            ThemeName::Neon => Self::neon(),
+            ThemeName::Monochrome => Self::monochrome(),
+        }
+    }
+
+    fn classic() -> Self {
         Self {
             wall: Color::DarkGrey,
             head: Color::Green,
@@ -25,14 +48,15 @@ impl Theme {
             food: Color::Red,
             bonus: Color::Magenta,
             title: Color::Green,
+            death_flash: Color::Red,
+            death_dark: Color::DarkRed,
             status_score: Color::Yellow,
             status_best: Color::Magenta,
             status_level: Color::Cyan,
         }
     }
 
-    /// Bright, vibrant colors for a neon arcade look.
-    pub fn neon() -> Self {
+    fn neon() -> Self {
         Self {
             wall: Color::White,
             head: Color::Cyan,
@@ -40,14 +64,15 @@ impl Theme {
             food: Color::Yellow,
             bonus: Color::Magenta,
             title: Color::Cyan,
+            death_flash: Color::Red,
+            death_dark: Color::DarkRed,
             status_score: Color::Yellow,
             status_best: Color::Magenta,
             status_level: Color::Cyan,
         }
     }
 
-    /// Greyscale palette for minimal terminals.
-    pub fn monochrome() -> Self {
+    fn monochrome() -> Self {
         Self {
             wall: Color::DarkGrey,
             head: Color::White,
@@ -55,19 +80,11 @@ impl Theme {
             food: Color::White,
             bonus: Color::Grey,
             title: Color::White,
+            death_flash: Color::White,
+            death_dark: Color::DarkGrey,
             status_score: Color::White,
             status_best: Color::Grey,
             status_level: Color::White,
-        }
-    }
-
-    /// Resolves a theme name to a palette. Returns `None` for unknown names.
-    pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "classic" => Some(Self::classic()),
-            "neon" => Some(Self::neon()),
-            "monochrome" => Some(Self::monochrome()),
-            _ => None,
         }
     }
 }
@@ -77,22 +94,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn from_name_classic() {
-        assert!(Theme::from_name("classic").is_some());
-    }
-
-    #[test]
-    fn from_name_neon() {
-        assert!(Theme::from_name("neon").is_some());
-    }
-
-    #[test]
-    fn from_name_monochrome() {
-        assert!(Theme::from_name("monochrome").is_some());
-    }
-
-    #[test]
-    fn from_name_invalid() {
-        assert!(Theme::from_name("rainbow").is_none());
+    fn all_theme_names_produce_a_theme() {
+        for name in ThemeName::value_variants() {
+            let theme = Theme::from_name(*name);
+            // Smoke-check: every theme has distinct head vs body colors
+            assert_ne!(
+                format!("{:?}", theme.head),
+                format!("{:?}", theme.body),
+                "{name:?} should have distinct head/body colors"
+            );
+        }
     }
 }

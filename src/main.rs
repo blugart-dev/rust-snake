@@ -11,14 +11,15 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use crossterm::{cursor, execute, terminal};
+use crossterm::style::Print;
+use crossterm::{cursor, execute, queue, terminal};
 
 use constants::{
     CELL_WIDTH, DEFAULT_TICK_MS, DYING_TICK_MS, MAX_BOARD_H, MAX_BOARD_W, MIN_BOARD_H, MIN_BOARD_W,
 };
 use game::{Game, GameState};
 use snake::Direction;
-use theme::Theme;
+use theme::{Theme, ThemeName};
 
 /// A classic Snake game for the terminal.
 #[derive(Parser)]
@@ -33,8 +34,8 @@ struct Args {
     height: Option<u16>,
 
     /// Color theme: classic, neon, or monochrome.
-    #[arg(long, default_value = "classic")]
-    theme: String,
+    #[arg(long, value_enum, default_value_t)]
+    theme: ThemeName,
 
     /// Disable terminal bell sound on food pickup and death.
     #[arg(long)]
@@ -59,14 +60,7 @@ fn compute_board_size(args: &Args) -> (u16, u16) {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-
-    let theme = Theme::from_name(&args.theme).unwrap_or_else(|| {
-        eprintln!(
-            "Unknown theme '{}'. Available: classic, neon, monochrome",
-            args.theme
-        );
-        std::process::exit(1);
-    });
+    let theme = Theme::from_name(args.theme);
 
     // Restore the terminal even on panic (raw mode would otherwise leave it unusable).
     let default_hook = std::panic::take_hook();
@@ -87,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = Instant::now();
 
     loop {
-        rendering::draw(&game, &mut stdout, &theme, !args.no_bell)?;
+        rendering::draw(&game, &mut stdout, &theme)?;
 
         // Determine tick interval based on game state
         let tick = match game.state {
@@ -141,7 +135,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Only advance the game when the tick interval has fully elapsed
         if last_tick.elapsed() >= tick {
-            game.update();
+            let events = game.update();
+
+            // Audio feedback via terminal bell
+            if !args.no_bell && (events.ate_food || events.ate_bonus || events.died) {
+                queue!(stdout, Print("\x07"))?;
+            }
+
             last_tick += tick;
             // Prevent catch-up spiral (e.g. after system sleep)
             let now = Instant::now();

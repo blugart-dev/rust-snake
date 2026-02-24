@@ -47,12 +47,7 @@ fn terminal_width(board_width: u16) -> u16 {
 
 /// Renders the full game frame. All draw commands are queued into a single
 /// buffer and flushed once at the end to prevent flickering.
-pub fn draw(game: &Game, w: &mut impl Write, theme: &Theme, bell: bool) -> io::Result<()> {
-    // Terminal bell for audio feedback on food/death events
-    if bell && (game.ate_food || game.ate_bonus || game.just_died) {
-        queue!(w, Print("\x07"))?;
-    }
-
+pub fn draw(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> {
     draw_border(game, w, theme)?;
     draw_interior(game, w)?;
 
@@ -70,7 +65,7 @@ pub fn draw(game: &Game, w: &mut impl Write, theme: &Theme, bell: bool) -> io::R
                     draw_overlay(game, w, &[("--- PAUSED ---".into(), Color::Yellow)])?;
                 }
                 GameState::Dying(frame) => {
-                    draw_snake_death(game, w, frame % 2 == 0)?;
+                    draw_snake_death(game, w, theme, frame % 2 == 0)?;
                 }
                 GameState::GameOver => {
                     let is_new_high = game.score > 0 && game.score >= game.high_score;
@@ -217,9 +212,13 @@ fn draw_snake(game: &Game, w: &mut impl Write, theme: &Theme) -> io::Result<()> 
     Ok(())
 }
 
-/// Redraws the snake in alternating red tones for the death flash effect.
-fn draw_snake_death(game: &Game, w: &mut impl Write, flash: bool) -> io::Result<()> {
-    let color = if flash { Color::Red } else { Color::DarkRed };
+/// Redraws the snake in alternating tones for the death flash effect.
+fn draw_snake_death(game: &Game, w: &mut impl Write, theme: &Theme, flash: bool) -> io::Result<()> {
+    let color = if flash {
+        theme.death_flash
+    } else {
+        theme.death_dark
+    };
     for seg in game.snake.body.iter() {
         let (tx, ty) = cell_to_terminal(seg.x, seg.y);
         queue!(
@@ -339,9 +338,9 @@ mod tests {
     use crate::game::Game;
 
     fn render_to_string(game: &Game) -> String {
-        let theme = Theme::classic();
+        let theme = Theme::from_name(crate::theme::ThemeName::Classic);
         let mut buf = Vec::new();
-        draw(game, &mut buf, &theme, false).unwrap();
+        draw(game, &mut buf, &theme).unwrap();
         String::from_utf8_lossy(&buf).to_string()
     }
 

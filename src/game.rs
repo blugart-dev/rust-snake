@@ -41,6 +41,17 @@ pub(crate) struct BonusFood {
     pub ticks_remaining: u16,
 }
 
+/// Events produced by a single game tick.
+#[derive(Debug, Default)]
+pub struct TickEvents {
+    /// The snake ate regular food this tick.
+    pub ate_food: bool,
+    /// The snake ate bonus food this tick.
+    pub ate_bonus: bool,
+    /// The snake collided and began the death sequence this tick.
+    pub died: bool,
+}
+
 /// All game state: snake, food, board, score, and phase.
 pub struct Game {
     pub(crate) snake: Snake,
@@ -58,12 +69,6 @@ pub struct Game {
     pub(crate) high_score: usize,
     /// Ticks elapsed since the last bonus-food spawn attempt.
     ticks_since_bonus: u16,
-    /// Set to `true` for one tick after eating regular food.
-    pub(crate) ate_food: bool,
-    /// Set to `true` for one tick after eating bonus food.
-    pub(crate) ate_bonus: bool,
-    /// Set to `true` for one tick when a collision triggers death.
-    pub(crate) just_died: bool,
 }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
@@ -114,9 +119,6 @@ impl Game {
             score: 0,
             high_score: load_high_score(),
             ticks_since_bonus: 0,
-            ate_food: false,
-            ate_bonus: false,
-            just_died: false,
         };
 
         game.spawn_food();
@@ -218,10 +220,9 @@ impl Game {
     }
 
     /// Advances the game by one tick: move, eat, collide.
-    pub fn update(&mut self) {
-        self.ate_food = false;
-        self.ate_bonus = false;
-        self.just_died = false;
+    /// Returns events describing what happened this tick.
+    pub fn update(&mut self) -> TickEvents {
+        let mut events = TickEvents::default();
 
         match self.state {
             GameState::Playing => {}
@@ -231,9 +232,9 @@ impl Game {
                 } else {
                     self.state = GameState::Dying(frame + 1);
                 }
-                return;
+                return events;
             }
-            _ => return,
+            _ => return events,
         }
 
         self.snake.apply_queued_direction();
@@ -254,14 +255,16 @@ impl Game {
         {
             self.snake.body.push_front(new_head);
             self.set_game_over();
-            return;
+            events.died = true;
+            return events;
         }
 
         // Self collision (checked before inserting head, so no skip needed)
         if self.snake.body.contains(&new_head) {
             self.snake.body.push_front(new_head);
             self.set_game_over();
-            return;
+            events.died = true;
+            return events;
         }
 
         self.snake.body.push_front(new_head);
@@ -269,31 +272,31 @@ impl Game {
         // Food consumption
         if new_head == self.food {
             self.score += 1;
-            self.ate_food = true;
+            events.ate_food = true;
             if !self.spawn_food() {
                 if self.score > self.high_score {
                     self.high_score = self.score;
                     save_high_score(self.high_score);
                 }
                 self.state = GameState::Win;
-                return;
+                return events;
             }
         } else if self.bonus_food.as_ref().is_some_and(|b| b.pos == new_head) {
             self.score += BONUS_POINTS;
-            self.ate_bonus = true;
+            events.ate_bonus = true;
             self.bonus_food = None;
         } else {
             self.snake.body.pop_back();
         }
 
         self.tick_bonus_food();
+        events
     }
 
     /// Begins the death sequence and persists the high score if beaten.
     fn set_game_over(&mut self) {
         self.state = GameState::Dying(0);
         self.bonus_food = None;
-        self.just_died = true;
         if self.score > self.high_score {
             self.high_score = self.score;
             save_high_score(self.high_score);
@@ -777,34 +780,39 @@ mod tests {
         );
     }
 
-    // ── Event flag tests ─────────────────────────────────────────────
+    // ── Tick event tests ──────────────────────────────────────────────
 
     #[test]
-    fn ate_food_flag_set_on_food_consumption() {
+    fn update_returns_ate_food_on_food_consumption() {
         let mut game = test_game();
         let head = *game.snake.head();
         game.food = Position::new(head.x + 1, head.y);
         game.snake.direction = Direction::Right;
-        game.update();
-        assert!(game.ate_food, "ate_food should be true after eating food");
+        let events = game.update();
+        assert!(events.ate_food);
+        assert!(!events.ate_bonus);
+        assert!(!events.died);
     }
 
     #[test]
-    fn ate_food_flag_cleared_on_normal_tick() {
+    fn update_returns_no_events_on_normal_tick() {
         let mut game = test_game();
         game.food = Position::new(1, 1);
         game.snake.direction = Direction::Right;
-        game.update();
-        assert!(!game.ate_food, "ate_food should be false on normal tick");
+        let events = game.update();
+        assert!(!events.ate_food);
+        assert!(!events.ate_bonus);
+        assert!(!events.died);
     }
 
     #[test]
-    fn just_died_flag_set_on_collision() {
+    fn update_returns_died_on_collision() {
         let mut game = test_game();
         game.snake = Snake::new(15, 1);
         game.snake.direction = Direction::Up;
-        game.update();
-        assert!(game.just_died, "just_died should be true after collision");
+        let events = game.update();
+        assert!(events.died);
+        assert!(!events.ate_food);
     }
 
     // ── Resize tests ─────────────────────────────────────────────────
